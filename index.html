@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lịch Tu Tập 2025 - Toàn Diện</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Calm Harmony (Slate, Sky, White, Indigo, Emerald) -->
+    <!-- Application Structure Plan: The application is a single-page dashboard. A new modal, triggered by a button in the header, now displays the list of completed days, decluttering the main view. A comprehensive habit tracker has been added to each observance day card, with both daily and conditional monthly tasks. This transforms the app into a detailed personal spiritual log. -->
+    <!-- Visualization & Content Choices: The card grid remains the core visualization. The habit tracker is implemented as a second, separate accordion within each card to maintain a clean UI. Goal: Provide detailed, multi-faceted tracking. Method: Conditional rendering in the card template shows monthly habits only on the 1st lunar day. Interaction: All checklist states are saved to localStorage for persistence. Justification: This layered approach provides deep functionality without overwhelming the user, allowing them to focus on what's relevant for that specific day. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        .card-enter {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .active-filter {
+            background-color: #4f46e5 !important;
+            color: white !important;
+            border-color: #4f46e5 !important;
+        }
+        .checklist-item input:checked + label {
+            text-decoration: line-through;
+            color: #64748b;
+        }
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-in-out;
+        }
+        .modal {
+            transition: opacity 0.25s ease;
+        }
+        .modal-content {
+            transition: transform 0.25s ease;
+        }
+        .observance-day {
+            border: 2px solid #6366f1;
+            background-color: #eef2ff;
+        }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <header class="text-center mb-6">
+            <h1 class="text-3xl sm:text-4xl font-bold text-slate-900">Lịch Tu Tập Năm Ất Tỵ 2025</h1>
+            <p class="mt-2 text-lg text-slate-600">Theo dõi công phu và 8 giới</p>
+        </header>
+
+        <div class="text-center mb-8 flex flex-wrap justify-center gap-4">
+            <button id="show-precepts-completed-btn" class="bg-emerald-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-emerald-700 transition">
+                Hoàn thành 8 giới: <span id="precepts-completed-count">0</span>
+            </button>
+            <button id="show-habits-completed-btn" class="bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-sky-700 transition">
+                Hoàn thành công phu: <span id="habits-completed-count">0</span>
+            </button>
+        </div>
+
+        <div class="bg-white p-4 rounded-lg shadow-md mb-8 sticky top-4 z-10">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="md:col-span-1">
+                    <label for="month-filter" class="block text-sm font-medium text-slate-700 mb-1">Lọc theo tháng Dương lịch</label>
+                    <select id="month-filter" class="w-full p-2 border border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                    </select>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Hiển thị ngày trai giới</label>
+                    <div id="type-filter" class="flex flex-wrap gap-2">
+                        <button data-filter="all" class="flex-grow sm:flex-grow-0 px-4 py-2 border border-slate-300 rounded-md text-sm font-medium hover:bg-slate-100 transition active-filter">Tất cả</button>
+                        <button data-filter="Tứ Trai" class="flex-grow sm:flex-grow-0 px-4 py-2 border border-slate-300 rounded-md text-sm font-medium hover:bg-slate-100 transition">Tứ Trai</button>
+                        <button data-filter="Lục Trai" class="flex-grow sm:flex-grow-0 px-4 py-2 border border-slate-300 rounded-md text-sm font-medium hover:bg-slate-100 transition">Lục Trai</button>
+                        <button data-filter="Thập Trai" class="flex-grow sm:flex-grow-0 px-4 py-2 border border-slate-300 rounded-md text-sm font-medium hover:bg-slate-100 transition">Thập Trai</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <main id="calendar-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+        </main>
+        
+        <div id="no-results" class="text-center py-12 hidden">
+             <p class="text-xl text-slate-500">Không tìm thấy ngày nào phù hợp.</p>
+        </div>
+    </div>
+
+    <!-- Modal for Completed Precepts Days -->
+    <div id="precepts-completed-modal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 invisible opacity-0">
+        <div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col transform scale-95">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 class="text-xl font-semibold text-slate-800">Những ngày đã hoàn thành (8/8 giới)</h3>
+                <button id="close-precepts-completed-modal-btn" class="text-slate-500 hover:text-slate-800 text-3xl leading-none">&times;</button>
+            </div>
+            <div id="precepts-completed-list" class="p-6 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                <!-- Content generated by JS -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal for Completed Habits Days -->
+    <div id="habits-completed-modal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 invisible opacity-0">
+        <div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col transform scale-95">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 class="text-xl font-semibold text-slate-800">Những ngày công phu hoàn thành</h3>
+                <button id="close-habits-completed-modal-btn" class="text-slate-500 hover:text-slate-800 text-3xl leading-none">&times;</button>
+            </div>
+            <div id="habits-completed-list" class="p-6 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                <!-- Content generated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const precepts = [
+            "Không sát sinh", "Không trộm cắp", "Không dâm dục", "Không nói dối",
+            "Không uống rượu", "Không trang điểm, ca múa, xem nghe", "Không nằm ngồi giường cao rộng đẹp", "Không ăn sau giờ ngọ"
+        ];
+        const dailyHabits = [
+            { key: 'niemphat', label: '1 tiếng niệm Phật' },
+            { key: 'ngoithien', label: '2 tiếng ngồi thiền' }
+        ];
+        const monthlyHabits = [
+            { key: 'cungduong', label: 'Cúng dường 200k' },
+            { key: 'thaca', label: '200k Thả cá' },
+            { key: 'tuthien', label: '100k Từ thiện' }
+        ];
+
+        let currentMonthFilter = 'all';
+        let currentTypeFilter = 'all';
+
+        const grid = document.getElementById('calendar-grid');
+        const monthFilter = document.getElementById('month-filter');
+        const typeFilterContainer = document.getElementById('type-filter');
+        const noResultsDiv = document.getElementById('no-results');
+        
+        const preceptsCompletedModal = document.getElementById('precepts-completed-modal');
+        const closePreceptsCompletedModalBtn = document.getElementById('close-precepts-completed-modal-btn');
+        const showPreceptsCompletedBtn = document.getElementById('show-precepts-completed-btn');
+        const preceptsCompletedCountSpan = document.getElementById('precepts-completed-count');
+        const preceptsCompletedList = document.getElementById('precepts-completed-list');
+        
+        const habitsCompletedModal = document.getElementById('habits-completed-modal');
+        const closeHabitsCompletedModalBtn = document.getElementById('close-habits-completed-modal-btn');
+        const showHabitsCompletedBtn = document.getElementById('show-habits-completed-btn');
+        const habitsCompletedCountSpan = document.getElementById('habits-completed-count');
+        const habitsCompletedList = document.getElementById('habits-completed-list');
+        
+        function generateFullYearData(year) {
+            const data = [];
+            const observanceDaysMap = new Map();
+            const observanceData = [
+                { gregorian: '29/01/2025', lunarDay: '1', lunarMonth: '1', types: ['Tứ Trai', 'Thập Trai'], note: 'Mùng 1 Tết' }, { gregorian: '05/02/2025', lunarDay: '8', lunarMonth: '1', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '11/02/2025', lunarDay: '14', lunarMonth: '1', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '12/02/2025', lunarDay: '15', lunarMonth: '1', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: 'Rằm tháng Giêng' }, { gregorian: '16/02/2025', lunarDay: '18', lunarMonth: '1', types: ['Thập Trai'], note: '' }, { gregorian: '20/02/2025', lunarDay: '23', lunarMonth: '1', types: ['Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '21/02/2025', lunarDay: '24', lunarMonth: '1', types: ['Thập Trai'], note: '' }, { gregorian: '25/02/2025', lunarDay: '28', lunarMonth: '1', types: ['Thập Trai'], note: '' }, { gregorian: '26/02/2025', lunarDay: '29', lunarMonth: '1', types: ['Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '27/02/2025', lunarDay: '30', lunarMonth: '1', types: ['Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '28/02/2025', lunarDay: '1', lunarMonth: '2', types: ['Tứ Trai', 'Thập Trai'], note: '' }, { gregorian: '07/03/2025', lunarDay: '8', lunarMonth: '2', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '13/03/2025', lunarDay: '14', lunarMonth: '2', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '14/03/2025', lunarDay: '15', lunarMonth: '2', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '17/03/2025', lunarDay: '18', lunarMonth: '2', types: ['Thập Trai'], note: '' }, { gregorian: '22/03/2025', lunarDay: '23', lunarMonth: '2', types: ['Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '23/03/2025', lunarDay: '24', lunarMonth: '2', types: ['Thập Trai'], note: '' }, { gregorian: '27/03/2025', lunarDay: '28', lunarMonth: '2', types: ['Thập Trai'], note: '' }, { gregorian: '28/03/2025', lunarDay: '29', lunarMonth: '2', types: ['Lục Trai', 'Thập Trai'], note: 'Tháng thiếu' }, { gregorian: '30/03/2025', lunarDay: '1', lunarMonth: '3', types: ['Tứ Trai', 'Thập Trai'], note: '' }, { gregorian: '06/04/2025', lunarDay: '8', lunarMonth: '3', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '12/04/2025', lunarDay: '14', lunarMonth: '3', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '13/04/2025', lunarDay: '15', lunarMonth: '3', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '16/04/2025', lunarDay: '18', lunarMonth: '3', types: ['Thập Trai'], note: '' }, { gregorian: '21/04/2025', lunarDay: '23', lunarMonth: '3', types: ['Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '22/04/2025', lunarDay: '24', lunarMonth: '3', types: ['Thập Trai'], note: '' }, { gregorian: '26/04/2025', lunarDay: '28', lunarMonth: '3', types: ['Thập Trai'], note: '' }, { gregorian: '27/04/2025', lunarDay: '29', lunarMonth: '3', types: ['Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '28/04/2025', lunarDay: '30', lunarMonth: '3', types: ['Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '29/04/2025', lunarDay: '1', lunarMonth: '4', types: ['Tứ Trai', 'Thập Trai'], note: '' }, { gregorian: '06/05/2025', lunarDay: '8', lunarMonth: '4', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '12/05/2025', lunarDay: '14', lunarMonth: '4', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '13/05/2025', lunarDay: '15', lunarMonth: '4', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: 'Lễ Phật Đản' }, { gregorian: '16/05/2025', lunarDay: '18', lunarMonth: '4', types: ['Thập Trai'], note: '' }, { gregorian: '21/05/2025', lunarDay: '23', lunarMonth: '4', types: ['Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '22/05/2025', lunarDay: '24', lunarMonth: '4', types: ['Thập Trai'], note: '' }, { gregorian: '27/05/2025', lunarDay: '29', lunarMonth: '4', types: ['Lục Trai', 'Thập Trai'], note: 'Tháng thiếu' }, { gregorian: '28/05/2025', lunarDay: '1', lunarMonth: '5', types: ['Tứ Trai', 'Thập Trai'], note: '' }, { gregorian: '04/06/2025', lunarDay: '8', lunarMonth: '5', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '10/06/2025', lunarDay: '14', lunarMonth: '5', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '11/06/2025', lunarDay: '15', lunarMonth: '5', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '14/06/2025', lunarDay: '18', lunarMonth: '5', types: ['Thập Trai'], note: '' }, { gregorian: '19/06/2025', lunarDay: '23', lunarMonth: '5', types: ['Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '20/06/2025', lunarDay: '24', lunarMonth: '5', types: ['Thập Trai'], note: '' }, { gregorian: '25/06/2025', lunarDay: '28', lunarMonth: '5', types: ['Thập Trai'], note: '' }, { gregorian: '26/06/2025', lunarDay: '29', lunarMonth: '5', types: ['Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '27/06/2025', lunarDay: '30', lunarMonth: '5', types: ['Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '28/06/2025', lunarDay: '1', lunarMonth: '6', types: ['Tứ Trai', 'Thập Trai'], note: '' }, { gregorian: '05/07/2025', lunarDay: '8', lunarMonth: '6', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '11/07/2025', lunarDay: '14', lunarMonth: '6', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '12/07/2025', lunarDay: '15', lunarMonth: '6', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '15/07/2025', lunarDay: '18', lunarMonth: '6', types: ['Thập Trai'], note: '' }, { gregorian: '20/07/2025', lunarDay: '23', lunarMonth: '6', types: ['Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '21/07/2025', lunarDay: '24', lunarMonth: '6', types: ['Thập Trai'], note: '' }, { gregorian: '25/07/2025', lunarDay: '28', lunarMonth: '6', types: ['Thập Trai'], note: '' }, { gregorian: '26/07/2025', lunarDay: '29', lunarMonth: '6', types: ['Lục Trai', 'Thập Trai'], note: '' },
+                { gregorian: '09/07/2025', lunarDay: '14', lunarMonth: '6', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '10/07/2025', lunarDay: '15', lunarMonth: '6', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '13/07/2025', lunarDay: '18', lunarMonth: '6', types: ['Thập Trai'], note: '' }, { gregorian: '18/07/2025', lunarDay: '23', lunarMonth: '6', types: ['Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '19/07/2025', lunarDay: '24', lunarMonth: '6', types: ['Thập Trai'], note: '' }, { gregorian: '23/07/2025', lunarDay: '28', lunarMonth: '6', types: ['Thập Trai'], note: '' }, { gregorian: '24/07/2025', lunarDay: '29', lunarMonth: '6', types: ['Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '25/07/2025', lunarDay: '30', lunarMonth: '6', types: ['Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '27/07/2025', lunarDay: '1', lunarMonth: '6 Nhuận', types: ['Tứ Trai', 'Thập Trai'], note: '' }, { gregorian: '03/08/2025', lunarDay: '8', lunarMonth: '6 Nhuận', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '09/08/2025', lunarDay: '14', lunarMonth: '6 Nhuận', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '10/08/2025', lunarDay: '15', lunarMonth: '6 Nhuận', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '13/08/2025', lunarDay: '18', lunarMonth: '6 Nhuận', types: ['Thập Trai'], note: '' }, { gregorian: '18/08/2025', lunarDay: '23', lunarMonth: '6 Nhuận', types: ['Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '19/08/2025', lunarDay: '24', lunarMonth: '6 Nhuận', types: ['Thập Trai'], note: '' }, { gregorian: '24/08/2025', lunarDay: '29', lunarMonth: '6 Nhuận', types: ['Lục Trai', 'Thập Trai'], note: 'Tháng thiếu' }, { gregorian: '25/08/2025', lunarDay: '1', lunarMonth: '7', types: ['Tứ Trai', 'Thập Trai'], note: '' }, { gregorian: '01/09/2025', lunarDay: '8', lunarMonth: '7', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '07/09/2025', lunarDay: '14', lunarMonth: '7', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '08/09/2025', lunarDay: '15', lunarMonth: '7', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: 'Lễ Vu Lan' }, { gregorian: '11/09/2025', lunarDay: '18', lunarMonth: '7', types: ['Thập Trai'], note: '' }, { gregorian: '16/09/2025', lunarDay: '23', lunarMonth: '7', types: ['Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '17/09/2025', lunarDay: '24', lunarMonth: '7', types: ['Thập Trai'], note: '' }, { gregorian: '21/09/2025', lunarDay: '28', lunarMonth: '7', types: ['Thập Trai'], note: '' }, { gregorian: '22/09/2025', lunarDay: '29', lunarMonth: '7', types: ['Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '23/09/2025', lunarDay: '30', lunarMonth: '7', types: ['Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '24/09/2025', lunarDay: '1', lunarMonth: '8', types: ['Tứ Trai', 'Thập Trai'], note: '' }, { gregorian: '01/10/2025', lunarDay: '8', lunarMonth: '8', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '07/10/2025', lunarDay: '14', lunarMonth: '8', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '08/10/2025', lunarDay: '15', lunarMonth: '8', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: 'Tết Trung Thu' }, { gregorian: '11/10/2025', lunarDay: '18', lunarMonth: '8', types: ['Thập Trai'], note: '' }, { gregorian: '16/10/2025', lunarDay: '23', lunarMonth: '8', types: ['Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '17/10/2025', lunarDay: '24', lunarMonth: '8', types: ['Thập Trai'], note: '' }, { gregorian: '22/10/2025', lunarDay: '29', lunarMonth: '8', types: ['Lục Trai', 'Thập Trai'], note: 'Tháng thiếu' }, { gregorian: '23/10/2025', lunarDay: '1', lunarMonth: '9', types: ['Tứ Trai', 'Thập Trai'], note: '' }, { gregorian: '30/10/2025', lunarDay: '8', lunarMonth: '9', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '05/11/2025', lunarDay: '14', lunarMonth: '9', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '06/11/2025', lunarDay: '15', lunarMonth: '9', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '09/11/2025', lunarDay: '18', lunarMonth: '9', types: ['Thập Trai'], note: '' }, { gregorian: '14/11/2025', lunarDay: '23', lunarMonth: '9', types: ['Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '15/11/2025', lunarDay: '24', lunarMonth: '9', types: ['Thập Trai'], note: '' }, { gregorian: '20/11/2025', lunarDay: '29', lunarMonth: '9', types: ['Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '21/11/2025', lunarDay: '30', lunarMonth: '9', types: ['Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '22/11/2025', lunarDay: '1', lunarMonth: '10', types: ['Tứ Trai', 'Thập Trai'], note: '' }, { gregorian: '29/11/2025', lunarDay: '8', lunarMonth: '10', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '05/12/2025', lunarDay: '14', lunarMonth: '10', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '06/12/2025', lunarDay: '15', lunarMonth: '10', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '09/12/2025', lunarDay: '18', lunarMonth: '10', types: ['Thập Trai'], note: '' }, { gregorian: '14/12/2025', lunarDay: '23', lunarMonth: '10', types: ['Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '15/12/2025', lunarDay: '24', lunarMonth: '10', types: ['Thập Trai'], note: '' }, { gregorian: '20/12/2025', lunarDay: '29', lunarMonth: '10', types: ['Lục Trai', 'Thập Trai'], note: 'Tháng thiếu' }, { gregorian: '21/12/2025', lunarDay: '1', lunarMonth: '11', types: ['Tứ Trai', 'Thập Trai'], note: '' }, { gregorian: '28/12/2025', lunarDay: '8', lunarMonth: '11', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '03/01/2026', lunarDay: '14', lunarMonth: '11', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '04/01/2026', lunarDay: '15', lunarMonth: '11', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '07/01/2026', lunarDay: '18', lunarMonth: '11', types: ['Thập Trai'], note: '' }, { gregorian: '12/01/2026', lunarDay: '23', lunarMonth: '11', types: ['Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '13/01/2026', lunarDay: '24', lunarMonth: '11', types: ['Thập Trai'], note: '' }, { gregorian: '18/01/2026', lunarDay: '29', lunarMonth: '11', types: ['Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '19/01/2026', lunarDay: '30', lunarMonth: '11', types: ['Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '20/01/2026', lunarDay: '1', lunarMonth: '12', types: ['Tứ Trai', 'Thập Trai'], note: '' }, { gregorian: '27/01/2026', lunarDay: '8', lunarMonth: '12', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '02/02/2026', lunarDay: '14', lunarMonth: '12', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '03/02/2026', lunarDay: '15', lunarMonth: '12', types: ['Tứ Trai', 'Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '06/02/2026', lunarDay: '18', lunarMonth: '12', types: ['Thập Trai'], note: '' }, { gregorian: '11/02/2026', lunarDay: '23', lunarMonth: '12', types: ['Lục Trai', 'Thập Trai'], note: '' }, { gregorian: '12/02/2026', lunarDay: '24', lunarMonth: '12', types: ['Thập Trai'], note: '' }, { gregorian: '16/02/2026', lunarDay: '28', lunarMonth: '12', types: ['Thập Trai'], note: '' }, { gregorian: '17/02/2026', lunarDay: '29', lunarMonth: '12', types: ['Lục Trai', 'Thập Trai'], note: 'Tháng thiếu, Giao thừa' }
+            ];
+            observanceData.forEach(d => observanceDaysMap.set(d.gregorian, d));
+            
+            const startDate = new Date(year, 0, 1);
+            const endDate = new Date(year, 11, 31);
+            
+            for (let d = startDate; d <= endDate; d.setDate(d.getDate() + 1)) {
+                const day = String(d.getDate()).padStart(2, '0');
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const gregorian = `${day}/${month}/${year}`;
+                const observanceDay = observanceDaysMap.get(gregorian);
+
+                data.push({
+                    gregorian: gregorian,
+                    gregorianDate: new Date(d),
+                    lunarDay: observanceDay ? observanceDay.lunarDay : '?', // Placeholder
+                    lunarMonth: observanceDay ? observanceDay.lunarMonth : '?', // Placeholder
+                    weekday: d.toLocaleDateString('vi-VN', { weekday: 'long' }),
+                    isObservanceDay: !!observanceDay,
+                    types: observanceDay ? observanceDay.types : [],
+                    note: observanceDay ? observanceDay.note : ''
+                });
+            }
+            return data;
+        }
+        
+        const calendarData = generateFullYearData(2025);
+
+        function renderCalendar(data) {
+            grid.innerHTML = '';
+            if (data.length === 0) {
+                noResultsDiv.classList.remove('hidden');
+            } else {
+                noResultsDiv.classList.add('hidden');
+            }
+
+            data.forEach(item => {
+                const card = document.createElement('div');
+                const dateKey = item.gregorian.replace(/\//g, '-');
+                card.className = `rounded-lg shadow-md p-4 flex flex-col transition-all duration-300 hover:shadow-xl hover:-translate-y-1 card-enter ${item.isObservanceDay ? 'observance-day' : 'bg-white'}`;
+                
+                // Habit Checklist
+                const dailyHabitItems = dailyHabits.map(habit => {
+                    const habitKey = `habit-${dateKey}-${habit.key}`;
+                    const isChecked = localStorage.getItem(habitKey) === 'true';
+                    return `<div class="checklist-item flex items-center"><input type="checkbox" id="${habitKey}" data-key="${habitKey}" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" ${isChecked ? 'checked' : ''}><label for="${habitKey}" class="ml-3 block text-sm text-slate-700 transition-colors">${habit.label}</label></div>`;
+                }).join('');
+                
+                let monthlyHabitItems = '';
+                if (item.lunarDay === '1') {
+                    monthlyHabitItems = monthlyHabits.map(habit => {
+                        const habitKey = `habit-${dateKey}-${habit.key}`;
+                        const isChecked = localStorage.getItem(habitKey) === 'true';
+                        return `<div class="checklist-item flex items-center"><input type="checkbox" id="${habitKey}" data-key="${habitKey}" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" ${isChecked ? 'checked' : ''}><label for="${habitKey}" class="ml-3 block text-sm text-slate-700 transition-colors">${habit.label}</label></div>`;
+                    }).join('');
+                }
+                
+                const totalHabits = dailyHabits.length + (item.lunarDay === '1' ? monthlyHabits.length : 0);
+                const completedHabits = dailyHabits.reduce((c, h) => localStorage.getItem(`habit-${dateKey}-${h.key}`) === 'true' ? c + 1 : c, 0) + (item.lunarDay === '1' ? monthlyHabits.reduce((c, h) => localStorage.getItem(`habit-${dateKey}-${h.key}`) === 'true' ? c + 1 : c, 0) : 0);
+
+
+                // Precept Checklist (only for observance days)
+                let preceptSection = '';
+                if(item.isObservanceDay) {
+                    const completedCount = precepts.reduce((count, _, index) => localStorage.getItem(`precept-${dateKey}-${index}`) === 'true' ? count + 1 : count, 0);
+                    const progressColor = completedCount === 8 ? 'bg-emerald-500' : 'bg-indigo-500';
+                    const checklistItems = precepts.map((precept, index) => {
+                        const preceptKey = `precept-${dateKey}-${index}`;
+                        const isChecked = localStorage.getItem(preceptKey) === 'true';
+                        return `<div class="checklist-item flex items-center"><input type="checkbox" id="${preceptKey}" data-key="${preceptKey}" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" ${isChecked ? 'checked' : ''}><label for="${preceptKey}" class="ml-3 block text-sm text-slate-700 transition-colors">${precept}</label></div>`;
+                    }).join('');
+
+                    preceptSection = `
+                        <div>
+                            <button class="accordion-toggle w-full text-sm font-semibold text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-md py-2 transition-colors flex justify-between items-center px-3 mt-2">
+                                <span>Theo dõi 8 giới</span>
+                                <span class="accordion-icon transform transition-transform">&#9662;</span>
+                            </button>
+                            <div class="accordion-content mt-2">
+                                <div class="checklist-wrapper p-3 bg-slate-50 rounded-md">
+                                    <div class="w-full bg-slate-200 rounded-full h-2.5 mb-2">
+                                        <div class="progress-bar ${progressColor} h-2.5 rounded-full" style="width: ${(completedCount/8)*100}%"></div>
+                                    </div>
+                                    <div class="precept-checklist-container space-y-2">${checklistItems}</div>
+                                    <div class="completion-message hidden text-center p-4 bg-emerald-50 text-emerald-700 font-semibold rounded-md">
+                                        Chúc mừng bạn đã hoàn thành!
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                card.innerHTML = `
+                    <div class="flex-grow">
+                        <div class="flex justify-between items-start mb-2">
+                             <p class="text-sm font-medium ${item.isObservanceDay ? 'text-indigo-600' : 'text-slate-500'}">${item.weekday}</p>
+                             ${item.note ? `<span class="text-xs font-semibold bg-indigo-100 text-indigo-800 px-2 py-1 rounded-md">${item.note}</span>` : ''}
+                        </div>
+                        <p class="text-lg font-bold text-slate-900">${item.gregorian}</p>
+                        <p class="text-sm text-slate-500 mt-1">
+                            ${item.lunarDay !== '?' ? `Ngày ${item.lunarDay} / ${item.lunarMonth} ÂL` : ''}
+                        </p>
+                    </div>
+                    <div class="border-t border-slate-200 mt-4 pt-3 space-y-2">
+                        ${item.isObservanceDay ? `<div class="flex flex-wrap items-center gap-y-1">${item.types.map(type => `<span class="text-xs font-medium mr-2 px-2.5 py-0.5 rounded-full bg-sky-100 text-sky-800">${type}</span>`).join('')}</div>` : ''}
+                        <div>
+                            <button class="accordion-toggle w-full text-sm font-semibold text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-md py-2 transition-colors flex justify-between items-center px-3">
+                                <span>Theo dõi công phu</span>
+                                <span class="accordion-icon transform transition-transform">&#9662;</span>
+                            </button>
+                            <div class="accordion-content mt-2">
+                                <div class="habit-checklist-wrapper p-3 bg-slate-50 rounded-md">
+                                    <div class="habit-checklist-container space-y-2">
+                                        ${dailyHabitItems}
+                                        ${monthlyHabitItems ? `<div class="border-t border-slate-200 my-2"></div>${monthlyHabitItems}` : ''}
+                                    </div>
+                                     <div class="habit-completion-message hidden text-center p-4 bg-emerald-50 text-emerald-700 font-semibold rounded-md">
+                                        Hoàn thành công phu!
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        ${preceptSection}
+                    </div>
+                `;
+                
+                if(item.isObservanceDay) {
+                    const completedCount = precepts.reduce((count, _, index) => localStorage.getItem(`precept-${dateKey}-${index}`) === 'true' ? count + 1 : count, 0);
+                    const checklistContainer = card.querySelector('.precept-checklist-container');
+                    const completionMessage = card.querySelector('.completion-message');
+                    if (completedCount === 8) {
+                        checklistContainer.classList.add('hidden');
+                        completionMessage.classList.remove('hidden');
+                    }
+                }
+                
+                const habitChecklistContainer = card.querySelector('.habit-checklist-container');
+                const habitCompletionMessage = card.querySelector('.habit-completion-message');
+                if (totalHabits > 0 && completedHabits === totalHabits) {
+                    habitChecklistContainer.classList.add('hidden');
+                    habitCompletionMessage.classList.remove('hidden');
+                }
+                
+                grid.appendChild(card);
+            });
+        }
+
+        function updateCompletedDays() {
+            const completedPreceptsItems = [];
+            const completedHabitsItems = [];
+
+            calendarData.forEach(item => {
+                const dateKey = item.gregorian.replace(/\//g, '-');
+                
+                // Check precepts completion
+                if (item.isObservanceDay) {
+                    const completedPreceptsCount = precepts.reduce((count, _, index) => localStorage.getItem(`precept-${dateKey}-${index}`) === 'true' ? count + 1 : count, 0);
+                    if (completedPreceptsCount === 8) {
+                        completedPreceptsItems.push(item);
+                    }
+                }
+
+                // Check habits completion
+                const totalHabits = dailyHabits.length + (item.lunarDay === '1' ? monthlyHabits.length : 0);
+                if (totalHabits > 0) {
+                    const completedHabitsCount = dailyHabits.reduce((c, h) => localStorage.getItem(`habit-${dateKey}-${h.key}`) === 'true' ? c + 1 : c, 0) + (item.lunarDay === '1' ? monthlyHabits.reduce((c, h) => localStorage.getItem(`habit-${dateKey}-${h.key}`) === 'true' ? c + 1 : c, 0) : 0);
+                    if (completedHabitsCount === totalHabits) {
+                        completedHabitsItems.push(item);
+                    }
+                }
+            });
+
+            // Update Precepts Count and List
+            preceptsCompletedCountSpan.textContent = completedPreceptsItems.length;
+            if (completedPreceptsItems.length > 0) {
+                preceptsCompletedList.innerHTML = completedPreceptsItems.sort((a,b) => a.gregorianDate - b.gregorianDate).map(item => 
+                    `<div class="bg-emerald-50 text-emerald-800 text-sm font-medium px-3 py-1.5 rounded-md text-center">${item.gregorian}</div>`
+                ).join('');
+            } else {
+                preceptsCompletedList.innerHTML = `<p class="col-span-full text-center text-slate-500">Chưa có ngày nào hoàn thành.</p>`;
+            }
+            
+            // Update Habits Count and List
+            habitsCompletedCountSpan.textContent = completedHabitsItems.length;
+            if (completedHabitsItems.length > 0) {
+                habitsCompletedList.innerHTML = completedHabitsItems.sort((a,b) => a.gregorianDate - b.gregorianDate).map(item => 
+                    `<div class="bg-sky-50 text-sky-800 text-sm font-medium px-3 py-1.5 rounded-md text-center">${item.gregorian}</div>`
+                ).join('');
+            } else {
+                habitsCompletedList.innerHTML = `<p class="col-span-full text-center text-slate-500">Chưa có ngày nào hoàn thành.</p>`;
+            }
+        }
+
+        function populateMonthFilter() {
+            const monthMap = new Map();
+            calendarData.forEach(item => {
+                const year = item.gregorianDate.getFullYear();
+                const month = item.gregorianDate.getMonth() + 1;
+                const key = `${year}-${month}`;
+                if (!monthMap.has(key)) {
+                    monthMap.set(key, `Tháng ${month} / ${year}`);
+                }
+            });
+
+            const sortedMonthKeys = Array.from(monthMap.keys()).sort((a, b) => {
+                const [yearA, monthA] = a.split('-').map(Number);
+                const [yearB, monthB] = b.split('-').map(Number);
+                return yearA - yearB || monthA - monthB;
+            });
+
+            monthFilter.innerHTML = '<option value="all">Tất cả các tháng</option>';
+            sortedMonthKeys.forEach(key => {
+                const option = document.createElement('option');
+                option.value = key;
+                option.textContent = monthMap.get(key);
+                monthFilter.appendChild(option);
+            });
+        }
+
+        function handleGridClick(e) {
+            const accordionToggle = e.target.closest('.accordion-toggle');
+            if (accordionToggle) {
+                const content = accordionToggle.nextElementSibling;
+                const icon = accordionToggle.querySelector('.accordion-icon');
+                if (content.style.maxHeight) {
+                    content.style.maxHeight = null;
+                    icon.style.transform = 'rotate(0deg)';
+                } else {
+                    content.style.maxHeight = content.scrollHeight + "px";
+                    icon.style.transform = 'rotate(180deg)';
+                }
+                return;
+            }
+            
+            if (e.target.type === 'checkbox' && e.target.dataset.key) {
+                const key = e.target.dataset.key;
+                localStorage.setItem(key, e.target.checked);
+                
+                const card = e.target.closest('.card-enter');
+                const dateKey = key.split('-').slice(1, 4).join('-');
+                const item = calendarData.find(d => d.gregorian.replace(/\//g, '-') === dateKey);
+
+                if (key.startsWith('precept-')) {
+                    const completedCount = precepts.reduce((count, _, index) => localStorage.getItem(`precept-${dateKey}-${index}`) === 'true' ? count + 1 : count, 0);
+                    const progressBar = card.querySelector('.progress-bar');
+                    const checklistContainer = card.querySelector('.precept-checklist-container');
+                    const completionMessage = card.querySelector('.completion-message');
+                    
+                    progressBar.style.width = `${(completedCount/8)*100}%`;
+                    progressBar.classList.toggle('bg-emerald-500', completedCount === 8);
+                    progressBar.classList.toggle('bg-indigo-500', completedCount !== 8);
+                    
+                    checklistContainer.classList.toggle('hidden', completedCount === 8);
+                    completionMessage.classList.toggle('hidden', completedCount !== 8);
+                }
+                
+                if (key.startsWith('habit-')) {
+                    const totalHabits = dailyHabits.length + (item.lunarDay === '1' ? monthlyHabits.length : 0);
+                    const completedHabits = dailyHabits.reduce((c, h) => localStorage.getItem(`habit-${dateKey}-${h.key}`) === 'true' ? c + 1 : c, 0) + (item.lunarDay === '1' ? monthlyHabits.reduce((c, h) => localStorage.getItem(`habit-${dateKey}-${h.key}`) === 'true' ? c + 1 : c, 0) : 0);
+                    const habitChecklistContainer = card.querySelector('.habit-checklist-container');
+                    const habitCompletionMessage = card.querySelector('.habit-completion-message');
+                    
+                    habitChecklistContainer.classList.toggle('hidden', completedHabits === totalHabits);
+                    habitCompletionMessage.classList.toggle('hidden', completedHabits !== totalHabits);
+                }
+
+                updateCompletedDays();
+            }
+        }
+
+        function applyFilters() {
+            let filteredData = calendarData;
+
+            if (currentMonthFilter !== 'all') {
+                const [year, month] = currentMonthFilter.split('-').map(Number);
+                filteredData = filteredData.filter(item => item.gregorianDate.getFullYear() === year && (item.gregorianDate.getMonth() + 1) === month);
+            }
+
+            if (currentTypeFilter !== 'all') {
+                filteredData = filteredData.filter(item => item.isObservanceDay && item.types.includes(currentTypeFilter));
+            } else {
+                 filteredData = filteredData.filter(item => item.isObservanceDay || currentTypeFilter === 'all');
+            }
+
+            renderCalendar(filteredData);
+        }
+
+        monthFilter.addEventListener('change', (e) => {
+            currentMonthFilter = e.target.value;
+            applyFilters();
+        });
+        
+        typeFilterContainer.addEventListener('click', (e) => {
+            if (e.target.tagName === 'BUTTON') {
+                currentTypeFilter = e.target.dataset.filter;
+                document.querySelectorAll('#type-filter button').forEach(btn => btn.classList.remove('active-filter'));
+                e.target.classList.add('active-filter');
+                applyFilters();
+            }
+        });
+
+        grid.addEventListener('click', handleGridClick);
+
+        showPreceptsCompletedBtn.addEventListener('click', () => {
+            preceptsCompletedModal.classList.remove('invisible', 'opacity-0');
+            preceptsCompletedModal.querySelector('.modal-content').classList.remove('scale-95');
+        });
+        closePreceptsCompletedModalBtn.addEventListener('click', () => {
+            preceptsCompletedModal.classList.add('invisible', 'opacity-0');
+            preceptsCompletedModal.querySelector('.modal-content').classList.add('scale-95');
+        });
+        preceptsCompletedModal.addEventListener('click', (e) => {
+            if (e.target === preceptsCompletedModal) {
+                 preceptsCompletedModal.classList.add('invisible', 'opacity-0');
+                 preceptsCompletedModal.querySelector('.modal-content').classList.add('scale-95');
+            }
+        });
+        
+        showHabitsCompletedBtn.addEventListener('click', () => {
+            habitsCompletedModal.classList.remove('invisible', 'opacity-0');
+            habitsCompletedModal.querySelector('.modal-content').classList.remove('scale-95');
+        });
+        closeHabitsCompletedModalBtn.addEventListener('click', () => {
+            habitsCompletedModal.classList.add('invisible', 'opacity-0');
+            habitsCompletedModal.querySelector('.modal-content').classList.add('scale-95');
+        });
+        habitsCompletedModal.addEventListener('click', (e) => {
+            if (e.target === habitsCompletedModal) {
+                 habitsCompletedModal.classList.add('invisible', 'opacity-0');
+                 habitsCompletedModal.querySelector('.modal-content').classList.add('scale-95');
+            }
+        });
+
+
+        document.addEventListener('DOMContentLoaded', () => {
+            populateMonthFilter();
+            renderCalendar(calendarData);
+            updateCompletedDays();
+        });
+
+    </script>
+</body>
+</html>
